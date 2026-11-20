@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// Product, category and brand images are public; only admins upload.
+// Invoices are readable by admins (customers get them through a signed URL from a Function).
+// Enquiry photos can be uploaded by phone-verified visitors (max 5 MB, images only).
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAdmin() { return request.auth != null && request.auth.token.admin == true; }
+    function isImage() { return request.resource.contentType.matches('image/.*'); }
+
+    match /products/{rest=**} {
+      allow read: if true;
+      allow write: if isAdmin() && isImage() && request.resource.size < 8 * 1024 * 1024;
+    }
+    match /categories/{rest=**} {
+      allow read: if true;
+      allow write: if isAdmin() && isImage() && request.resource.size < 4 * 1024 * 1024;
+    }
+    match /brands/{rest=**} {
+      allow read: if true;
+      allow write: if isAdmin() && isImage() && request.resource.size < 2 * 1024 * 1024;
+    }
+    match /site/{rest=**} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /enquiries/{uid}/{file} {
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.auth.token.phone_number != null
+        && isImage() && request.resource.size < 5 * 1024 * 1024;
+      allow read: if isAdmin() || (request.auth != null && request.auth.uid == uid);
+    }
+    match /invoices/{rest=**} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}

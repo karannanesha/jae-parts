@@ -1,0 +1,14 @@
+{
+  "projects": {
+    "default": "jae-parts-dev",
+    "dev": "jae-parts-dev"
+  },
+  "targets": {
+    "jae-parts-dev": {
+      "hosting": {
+        "store": ["jae-parts-dev"],
+        "admin": ["jae-parts-dev-admin"]
+      }
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "scripts",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@jae/shared": "*",
+    "firebase-admin": "^12.7.0"
+  }
+}

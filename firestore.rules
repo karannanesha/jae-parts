@@ -1,0 +1,87 @@
+rules_version = '2';
+
+// Jay Ambe Enterprises — Firestore security rules
+//
+// Who can do what:
+//   • Anyone:            read published products, categories, brands, pages, store settings, PIN codes
+//   • Signed-in (phone): read/write own profile, read own orders, submit an enquiry
+//   • Admins:            everything. Admin = custom claim { admin: true } (set with scripts/set-admin.mjs)
+//   • Orders are only ever CREATED by Cloud Functions (prices are recomputed server-side),
+//     so clients can never write order documents.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+    function isAdmin() { return signedIn() && request.auth.token.admin == true; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function verifiedPhone() { return signedIn() && request.auth.token.phone_number != null; }
+
+    // ---------- Catalogue ----------
+    match /products/{id} {
+      allow read: if resource.data.status == 'published' || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /categories/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /brands/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------- Content & settings ----------
+    match /pages/{slug} {
+      allow read: if resource.data.published == true || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /settings/{doc} {
+      // settings/store is public (contact details, home sections, shipping text).
+      // Anything else under settings (counters, private config) is admin-only.
+      allow read: if doc == 'store' || isAdmin();
+      allow write: if isAdmin();
+    }
+    match /pincodes/{pin} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /coupons/{code} {
+      // Validated by Cloud Functions at checkout; never exposed to shoppers.
+      allow read, write: if isAdmin();
+    }
+
+    // ---------- Customers ----------
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid)
+        && !request.resource.data.keys().hasAny(['role', 'admin', 'totalSpent', 'orderCount']);
+      allow update: if isOwner(uid)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'admin', 'totalSpent', 'orderCount']);
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Orders (server-written) ----------
+    match /orders/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create, delete: if false;
+      allow update: if isAdmin();
+    }
+
+    // ---------- Enquiries (contact form + bulk enquiry) ----------
+    // The phone OTP on the form signs the visitor in with Firebase Phone Auth,
+    // so a verified phone number is required to submit.
+    match /enquiries/{id} {
+      allow create: if verifiedPhone()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.phone == request.auth.token.phone_number
+        && request.resource.data.status == 'new'
+        && request.resource.data.message is string
+        && request.resource.data.message.size() <= 5000
+        && request.resource.data.name is string
+        && request.resource.data.name.size() <= 120;
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+  }
+}

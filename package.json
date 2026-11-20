@@ -1,0 +1,28 @@
+{
+  "name": "jae-parts",
+  "private": true,
+  "description": "Jay Ambe Enterprises printer parts store — React + Vite storefront, admin panel and Firebase backend",
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "scripts"
+  ],
+  "scripts": {
+    "postinstall": "npm install --prefix functions --no-audit --no-fund",
+    "dev:store": "npm run dev -w apps/store",
+    "dev:admin": "npm run dev -w apps/admin",
+    "emulators": "firebase emulators:start --import=./.emulator-data --export-on-exit",
+    "seed": "node scripts/seed.mjs",
+    "import:local": "node scripts/import-woocommerce.mjs --emulators --limit=80 --keep-image-urls",
+    "import:dev": "node scripts/import-woocommerce.mjs",
+    "recount": "node scripts/recount.mjs",
+    "set-admin": "node scripts/set-admin.mjs",
+    "build": "npm run build -w apps/store && npm run build -w apps/admin",
+    "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,storage",
+    "deploy:hosting": "npm run build && firebase deploy --only hosting",
+    "deploy:functions": "firebase deploy --only functions"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
